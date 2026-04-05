@@ -1,91 +1,53 @@
 #include <Arduino.h>
-#include <Wire.h>
-#include <SPI.h>
-#include <LoRa.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include <WiFi.h>
+#include <esp_now.h>
 
-// ===== OLED config =====
-#define SCREEN_WIDTH 128
-#define SCREEN_HEIGHT 64
-#define OLED_SDA 21
-#define OLED_SCL 22
-#define OLED_RESET -1
+// Heltec MAC (receiver)
+uint8_t receiverMac[] = {0x3C, 0x0F, 0x02, 0xEE, 0x09, 0x5C};
 
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+typedef struct {
+  int value;
+} Data;
 
-// ===== LoRa pins (SX1276) =====
-#define LORA_SCK 5
-#define LORA_MISO 19
-#define LORA_MOSI 27
-#define LORA_SS 18
-#define LORA_RST 23
-#define LORA_DIO0 33
+Data data;
 
-// ===== Matching Heltec settings =====
-#define LORA_FREQUENCY 915E6
-#define LORA_BW 250E3
-#define LORA_SF 9
-#define LORA_TX_POWER 0
+void onSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
+  Serial.print("Send Status: ");
+  Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Success" : "Fail");
+}
 
 void setup() {
   Serial.begin(115200);
+  WiFi.mode(WIFI_STA);
 
-  // ===== OLED init =====
-  Wire.begin(OLED_SDA, OLED_SCL);
+  // Optional but helps stability
+  WiFi.disconnect();
 
-  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
-    Serial.println("OLED init failed");
-    while (true);
+  if (esp_now_init() != ESP_OK) {
+    Serial.println("ESP-NOW init failed");
+    return;
   }
 
-  display.clearDisplay();
-  display.setTextSize(1);
-  display.setTextColor(SSD1306_WHITE);
-  display.setCursor(0, 0);
-  display.println("Booting...");
-  display.display();
+  esp_now_register_send_cb(onSent);
 
-  // ===== LoRa SPI init =====
-  SPI.begin(LORA_SCK, LORA_MISO, LORA_MOSI, LORA_SS);
-  LoRa.setPins(LORA_SS, LORA_RST, LORA_DIO0);
+  esp_now_peer_info_t peerInfo = {};
+  memcpy(peerInfo.peer_addr, receiverMac, 6);
+  peerInfo.channel = 0;     // auto
+  peerInfo.encrypt = false;
 
-  if (!LoRa.begin(LORA_FREQUENCY)) {
-    Serial.println("LoRa init failed!");
-    display.println("LoRa FAIL");
-    display.display();
-    while (true);
+  if (esp_now_add_peer(&peerInfo) != ESP_OK) {
+    Serial.println("Failed to add peer");
+    return;
   }
-
-  // Match Heltec parameters
-  LoRa.setSignalBandwidth(LORA_BW);
-  LoRa.setSpreadingFactor(LORA_SF);
-  LoRa.setTxPower(LORA_TX_POWER);
-
-  Serial.println("LoRa init OK");
-
-  display.clearDisplay();
-  display.setCursor(0, 0);
-  display.println("LoRa Ready");
-  display.display();
 }
 
 void loop() {
-  String message = "Hello SX1276";
+  data.value++;
 
-  Serial.println("Sending: " + message);
+  esp_now_send(receiverMac, (uint8_t*)&data, sizeof(data));
 
-  // Send LoRa packet
-  LoRa.beginPacket();
-  LoRa.print(message);
-  LoRa.endPacket();
+  Serial.print("Sent: ");
+  Serial.println(data.value);
 
-  // Display on OLED
-  display.clearDisplay();
-  display.setCursor(0, 0);
-  display.println("Sending:");
-  display.println(message);
-  display.display();
-
-  delay(2000);
+  delay(1000);
 }
