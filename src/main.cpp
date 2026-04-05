@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <esp_now.h>
-
+#include "esp_wifi.h"
 // Heltec MAC (receiver)
 uint8_t receiverMac[] = {0x3C, 0x0F, 0x02, 0xEE, 0x09, 0x5C};
 
@@ -19,7 +19,7 @@ void onSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
 void setup() {
   Serial.begin(115200);
   WiFi.mode(WIFI_STA);
-
+  esp_wifi_set_channel(1, WIFI_SECOND_CHAN_NONE);
   // Optional but helps stability
   WiFi.disconnect();
 
