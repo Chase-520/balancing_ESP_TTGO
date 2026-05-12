@@ -1,53 +1,78 @@
 #include <Arduino.h>
-#include <WiFi.h>
-#include <esp_now.h>
-#include "esp_wifi.h"
-// Heltec MAC (receiver)
-uint8_t receiverMac[] = {0x3C, 0x0F, 0x02, 0xEE, 0x09, 0x5C};
+#include <joint.h>
+#include <scara_ik.h>
+// --- Configuration ---
+static const int J1_SERVO_PIN    = 4;
+static const int J1_NEUTRAL   = 1720;  
+static const double J1_STEP = 324.6760839;  
 
-typedef struct {
-  int value;
-} Data;
+static const int J2_SERVO_PIN    = 25;
+static const int J2_NEUTRAL   = 2820;  
+static const double J2_STEP = -515.6620156; 
 
-Data data;
-
-void onSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
-  Serial.print("Send Status: ");
-  Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Success" : "Fail");
-}
+String inputBuffer = "";
+// Setup joints
+Joint J1 = Joint(J1_SERVO_PIN,J1_STEP,J1_NEUTRAL,-1);
+Joint J2 = Joint(J2_SERVO_PIN,J2_STEP,J2_NEUTRAL,1);
+// Setup inverse kinematic solver
+ScaraIK solver = ScaraIK();
 
 void setup() {
-  Serial.begin(115200);
-  WiFi.mode(WIFI_STA);
-  esp_wifi_set_channel(1, WIFI_SECOND_CHAN_NONE);
-  // Optional but helps stability
-  WiFi.disconnect();
-
-  if (esp_now_init() != ESP_OK) {
-    Serial.println("ESP-NOW init failed");
-    return;
-  }
-
-  esp_now_register_send_cb(onSent);
-
-  esp_now_peer_info_t peerInfo = {};
-  memcpy(peerInfo.peer_addr, receiverMac, 6);
-  peerInfo.channel = 0;     // auto
-  peerInfo.encrypt = false;
-
-  if (esp_now_add_peer(&peerInfo) != ESP_OK) {
-    Serial.println("Failed to add peer");
-    return;
-  }
+    Serial.begin(115200);
+    Serial.println("=== ESP32 Servo – Serial end effector Control ===");
 }
-
 void loop() {
-  data.value++;
+    while (Serial.available()) {
+        char c = (char)Serial.read();
 
-  esp_now_send(receiverMac, (uint8_t*)&data, sizeof(data));
+        if (c == '\n' || c == '\r') {
+            inputBuffer.trim();
 
-  Serial.print("Sent: ");
-  Serial.println(data.value);
+            if (inputBuffer.length() > 0) {
 
-  delay(1000);
+                int commaIndex = inputBuffer.indexOf(',');
+
+                if (commaIndex != -1) {
+
+                    String firstStr  = inputBuffer.substring(0, commaIndex);
+                    String secondStr = inputBuffer.substring(commaIndex + 1);
+
+                    float value1 = firstStr.toFloat();
+                    float value2 = secondStr.toFloat();
+
+                    Serial.print("Value 1: ");
+                    Serial.println(value1);
+
+                    Serial.print("Value 2: ");
+                    Serial.println(value2);
+
+                    // Calculate Inverse Kinematics
+                    ScaraIKResult desire_pos;
+                    if(solver.solve(value1,value2, desire_pos)){
+                        // debug
+                        Serial.print("theta1 (rad): ");
+                        Serial.println(desire_pos.theta1);
+                        Serial.print("theta2 (rad): ");
+                        Serial.println(desire_pos.theta2);
+
+                        //Write to servos
+                        J1.move_to_pos(desire_pos.theta2);
+                        J2.move_to_pos(desire_pos.theta1);
+                    }else{
+                        Serial.println("unreachable");
+                    }
+
+                    
+
+
+                } else {
+                    Serial.println("Invalid format. Use: x,y");
+                }
+            }
+
+            inputBuffer = "";
+        } else {
+            inputBuffer += c;
+        }
+    }
 }
