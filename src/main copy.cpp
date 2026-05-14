@@ -6,11 +6,14 @@
 // static const int J1_NEUTRAL   = 1720;  
 // static const double J1_STEP = 324.6760839;  
 
+// static const int J2_SERVO_PIN    = 25;
+// static const int J2_NEUTRAL   = 2820;  
+// static const double J2_STEP = -515.6620156; 
 
 // String inputBuffer = "";
 // // Setup joints
 // Joint J1 = Joint(J1_SERVO_PIN,J1_STEP,J1_NEUTRAL,-1);
-
+// Joint J2 = Joint(J2_SERVO_PIN,J2_STEP,J2_NEUTRAL,1);
 // // Setup inverse kinematic solver
 // ScaraIK solver = ScaraIK();
 
@@ -47,11 +50,14 @@
 //                     ScaraIKResult desire_pos;
 //                     if(solver.solve(value1,value2, desire_pos)){
 //                         // debug
-//                         Serial.print("Desire angle (rad): ");
+//                         Serial.print("theta1 (rad): ");
+//                         Serial.println(desire_pos.theta1);
+//                         Serial.print("theta2 (rad): ");
 //                         Serial.println(desire_pos.theta2);
 
 //                         //Write to servos
 //                         J1.move_to_pos(desire_pos.theta2);
+//                         J2.move_to_pos(desire_pos.theta1);
 //                     }else{
 //                         Serial.println("unreachable");
 //                     }

@@ -22,10 +22,10 @@ public:
     void move_to_pos(double ang){
         /*Drive servo to desire angle in randians, assuming +x is 0*/
         radToPWM(ang);
-        Serial.print("moving to ");
-        Serial.print(ang);
-        Serial.print(" with pwm ");
-        Serial.println(_pos);
+        // Serial.print("moving to ");
+        // Serial.print(ang);
+        // Serial.print(" with pwm ");
+        // Serial.println(_pos);
         _servo.writeMicroseconds(constrain(_pos,900,2100));
     }
 
