@@ -8,6 +8,7 @@
 #endif
 class Joint{
 public:
+    Joint(){}
     Joint(int pin, double step, int station_pwm ,int dir){
         /*
             int pin: pin for this servo

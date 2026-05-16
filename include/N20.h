@@ -2,6 +2,11 @@
 
 #include <Arduino.h>
 
+struct N20_config{
+    int dir_pin;
+    int pwm_pin;
+    bool inverse;
+};
 class N20{
 
 public:
@@ -14,23 +19,24 @@ public:
         _dir_pin = dir;
         _pwm_pin = pwm;
         _inverse = inverse;       
-
         _attach();
-
     }
 
     void setSpeed(int speed) {
-        // 确保速度在0-255范围内
         bool cur_dir = true;
-        if (speed > 255) {
-            speed = 255;
-        }
-        if (speed < -255) {
-            speed = -255;
+        if(speed < 0){
             cur_dir = false;
         }
         
+        speed = abs(speed);
+        // 确保速度在0~255范围内
+        if(speed>255){
+            speed = 255;
+        }
+
+        // 反转方向
         if(_inverse)cur_dir=!cur_dir;
+
         // 设置方向
         digitalWrite(_dir_pin, cur_dir ? HIGH : LOW);
         
@@ -54,4 +60,4 @@ private:
         pinMode(_dir_pin, OUTPUT);
         pinMode(_pwm_pin, OUTPUT);
     }
-}
+};
