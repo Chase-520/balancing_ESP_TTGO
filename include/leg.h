@@ -13,6 +13,8 @@ struct Joint_config{
 class Leg{
 
 public:
+    Leg(){}
+    
     Leg(Joint_config& configL, Joint_config& configR){
         _init_joint(configL,JL);
         _init_joint(configR,JR);
