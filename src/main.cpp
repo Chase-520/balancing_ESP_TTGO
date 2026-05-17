@@ -4,6 +4,9 @@
 #include <Adafruit_BNO08x.h>
 #include <PID_v1.h>
 #include <N20.h>
+#include <WiFi.h>
+#include <esp_now.h>
+#include "esp_wifi.h"
 // --- Configuration ---
 static const int J1_SERVO_PIN    = 4;
 static const int J1_NEUTRAL   = 1720;  
@@ -50,6 +53,20 @@ float sampleTime = 0.01; //10ms sample time
 double J_input, J_output, J_setpoint;
 double Kp=0.4, Ki=0.05, Kd=0.01;
 PID myPID(&J_input, &J_output, &J_setpoint, Kp, Ki, Kd, DIRECT);
+
+// ---------- ESPNow wifi receive
+typedef struct {
+  int value;
+} Data;
+
+Data data;
+
+void onReceive(const uint8_t * mac, const uint8_t *incomingData, int len) {
+  memcpy(&data, incomingData, sizeof(data));
+
+  Serial.print("Received: ");
+  Serial.println(data.value);
+}
 
 // Robot states
 double r_height = 10; //10cm above the ground
@@ -118,7 +135,18 @@ void setup() {
     // Add this in setup()
     myPID.SetSampleTime(10); // match your 10ms intention
     // Add this in setup() - set to whatever x range your IK solver expects
-    myPID.SetOutputLimits(-20, 20); // example: ±20cm
+    myPID.SetOutputLimits(-20, 20); // example: 
+    
+    WiFi.mode(WIFI_STA);
+    esp_wifi_set_channel(1, WIFI_SECOND_CHAN_NONE);
+    WiFi.disconnect();
+
+    if (esp_now_init() != ESP_OK) {
+    Serial.println("ESP-NOW init failed");
+    return;
+    }
+
+    esp_now_register_recv_cb(onReceive);
 
 }
 
