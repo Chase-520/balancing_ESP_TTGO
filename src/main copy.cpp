@@ -3,19 +3,42 @@
 // #include <scara_ik.h>
 // #include <Adafruit_BNO08x.h>
 // #include <PID_v1.h>
+// #include <N20.h>
+// #include <WiFi.h>
+// #include <esp_now.h>
+// #include "esp_wifi.h"
 // // --- Configuration ---
 // static const int J1_SERVO_PIN    = 4;
-// static const int J1_NEUTRAL   = 1720;  
-// static const double J1_STEP = 324.6760839;  
+// static const int J1_NEUTRAL   = 2270;  
+// static const double J1_STEP = -315.1267873;  
 
 // static const int J2_SERVO_PIN    = 25;
-// static const int J2_NEUTRAL   = 3110;  
-// static const double J2_STEP = -534.7606088; 
+// static const int J2_NEUTRAL   = 1484;  
+// static const double J2_STEP = 307.4873501; 
+
+// static const int J3_SERVO_PIN    = 2;
+// static const int J3_NEUTRAL   = 2920;  
+// static const double J3_STEP = -534.7606088; 
+
+// static const int J4_SERVO_PIN    = 15;
+// static const int J4_NEUTRAL   = 1770;  
+// static const double J4_STEP = 534.7606088; 
+
+// static const int R_DIR_PIN = 13; //9
+// static const int R_PWM_PIN = 12; //7
+// static const bool R_INVERSED = false;
 
 // String inputBuffer = "";
 // // Setup joints
-// Joint J1 = Joint(J1_SERVO_PIN,J1_STEP,J1_NEUTRAL,-1);
-// Joint J2 = Joint(J2_SERVO_PIN,J2_STEP,J2_NEUTRAL,1);
+// Joint J1 = Joint(J1_SERVO_PIN,J1_STEP,J1_NEUTRAL,1);
+// Joint J2 = Joint(J2_SERVO_PIN,J2_STEP,J2_NEUTRAL,-1);
+// Joint J3 = Joint(J3_SERVO_PIN,J3_STEP,J3_NEUTRAL,1);
+// Joint J4 = Joint(J4_SERVO_PIN,J4_STEP,J4_NEUTRAL,-1);
+
+
+// // Setup wheel
+// N20 RN20 = N20(R_DIR_PIN,R_PWM_PIN,R_INVERSED);
+
 // // Setup inverse kinematic solver
 // ScaraIK solver = ScaraIK();
 
@@ -38,9 +61,25 @@
 // float sampleTime = 0.01; //10ms sample time
 
 // // Joint PID
-// double J_input, J_output, J_setpoint;
-// double Kp=0.4, Ki=0.05, Kd=0.01;
-// PID myPID(&J_input, &J_output, &J_setpoint, Kp, Ki, Kd, DIRECT);
+// double J_L_input, J_L_output, J_L_setpoint;
+// double J_R_input, J_R_output, J_R_setpoint;
+// double J_Kp=0.4, J_Ki=0.05, J_Kd=0.01;
+// PID right_leg_pid(&J_R_input, &J_R_output, &J_R_setpoint, J_Kp, J_Ki, J_Kd, AUTOMATIC);
+// PID left_leg_pid(&J_L_input, &J_L_output, &J_L_setpoint, J_Kp, J_Ki, J_Kd, AUTOMATIC);
+
+// // ---------- ESPNow wifi receive
+// typedef struct {
+//   int value;
+// } Data;
+
+// Data data;
+
+// void onReceive(const uint8_t * mac, const uint8_t *incomingData, int len) {
+//   memcpy(&data, incomingData, sizeof(data));
+
+//   Serial.print("Received: ");
+//   Serial.println(data.value);
+// }
 
 // // Robot states
 // double r_height = 10; //10cm above the ground
@@ -55,20 +94,6 @@
 //     Serial.println("Connect to IMU!");
 //     bno08x.enableReport(reportType,reportIntervalUs);
 //     lastTime = millis();
-// }
-// void setup() {
-//     Serial.begin(115200);
-//     Serial.println("=== ESP32 Servo – Serial end effector Control ===");
-//     init_IMU();
-
-//     J_setpoint = -90;         // target pitch (e.g., level)
-//     J_input = ypr.roll;    // current pitch from IMU
-//     myPID.SetMode(AUTOMATIC);
-//     // Add this in setup()
-//     myPID.SetSampleTime(10); // match your 10ms intention
-//     // Add this in setup() - set to whatever x range your IK solver expects
-//     myPID.SetOutputLimits(-20, 20); // example: ±20cm
-
 // }
 
 // void quaternionToEuler(float qr, float qi, float qj, float qk, euler_t* ypr, bool degrees = false) {
@@ -108,38 +133,84 @@
 //         break;
 //         }
 //     }
-//     J_input = ypr.roll;    //Update J_input
+    
+
+// }
+
+// void init_PIDs(){
+//   J_L_setpoint = -90;         // target pitch (e.g., level)
+//   J_L_input = -90;    // current pitch from IMU
+//   J_R_setpoint = -90;        
+//   J_R_input = -90; 
+
+//   left_leg_pid.SetMode(AUTOMATIC);
+//   // Add this in setup()
+//   left_leg_pid.SetSampleTime(10); // match your 10ms intention
+//   // Add this in setup() - set to whatever x range your IK solver expects
+//   left_leg_pid.SetOutputLimits(-20, 20); // example: 
+
+//   right_leg_pid.SetMode(AUTOMATIC);
+//   // Add this in setup()
+//   right_leg_pid.SetSampleTime(10); // match your 10ms intention
+//   // Add this in setup() - set to whatever x range your IK solver expects
+//   right_leg_pid.SetOutputLimits(-20, 20); // example: 
+// }
+
+// void init_WIFI(){
+//   WiFi.mode(WIFI_STA);
+//   esp_wifi_set_channel(1, WIFI_SECOND_CHAN_NONE);
+//   WiFi.disconnect();
+
+//   if (esp_now_init() != ESP_OK) {
+//   Serial.println("ESP-NOW init failed");
+//   return;
+//   }
+
+//   esp_now_register_recv_cb(onReceive);
+// }
+// void setup() {
+//   Serial.begin(115200);
+//   Serial.println("=== ESP32 Servo – Serial end effector Control ===");
+//   init_IMU();
+//   init_PIDs();
 
 // }
 
 // void loop() {
 //     imuLoop();
+//     // update pid inputs
+//     J_L_input = ypr.roll;    
+//     J_R_input = ypr.roll; 
+
 //     unsigned long currentTime = millis();
 //     // float deltaTime = (currentTime - lastTime) / 1000.0; // into seconds
 
+//     // RN20.setSpeed(60);
 //     ScaraIKResult desire_pos;
-//     if(myPID.Compute()){
+//     if(right_leg_pid.Compute()){
 //         // Calculate Inverse Kinematics
-//         if(solver.solve(J_output,r_height, desire_pos)){
-//             // debug
-//             // Serial.print("theta1 (rad): ");
-//             // Serial.println(desire_pos.theta1);
-//             // Serial.print("theta2 (rad): ");
-//             // Serial.println(desire_pos.theta2);
-    
+//         if(solver.solve(-J_R_output,r_height, desire_pos)){    
 //             //Write to servos
-//             J1.move_to_pos(desire_pos.theta2);
-//             J2.move_to_pos(desire_pos.theta1);
+//             J1.move_to_pos(desire_pos.theta1);
+//             J2.move_to_pos(desire_pos.theta2);
+//         }
+//     }
+
+//     if(left_leg_pid.Compute()){
+//         // Calculate Inverse Kinematics
+//         if(solver.solve(J_L_output,r_height, desire_pos)){    
+//             //Write to servos
+//             J3.move_to_pos(desire_pos.theta1);
+//             J4.move_to_pos(desire_pos.theta2);
 //         }
 //     }
 
 //     static unsigned long lastPrintTime = 0;
 //     if (currentTime - lastPrintTime > 500) {
 //         Serial.print("Roll: ");        Serial.println(ypr.roll);
-//         Serial.print("Setpoint: ");    Serial.println(J_setpoint);
-//         Serial.print("J_input: ");     Serial.println(J_input);
-//         Serial.print("J_output: ");    Serial.println(J_output);
-//         Serial.print("PID mode: ");    Serial.println(myPID.GetMode());
+//         Serial.print("Setpoint: ");    Serial.println(J_R_setpoint);
+//         Serial.print("J_input: ");     Serial.println(J_R_input);
+//         Serial.print("J_output: ");    Serial.println(J_R_output);
 //         lastPrintTime = currentTime;
 //     }
 
