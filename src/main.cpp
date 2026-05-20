@@ -24,9 +24,13 @@ static const int J4_SERVO_PIN    = 15;
 static const int J4_NEUTRAL   = 1770;  
 static const double J4_STEP = 534.7606088; 
 
-static const int R_DIR_PIN = 13; //9
-static const int R_PWM_PIN = 12; //7
+static const int R_DIR_PIN = 14; //10
+static const int R_PWM_PIN = 35; //8
 static const bool R_INVERSED = false;
+
+static const int L_DIR_PIN = 13; //9
+static const int L_PWM_PIN = 12; //7
+static const bool L_INVERSED = true;
 
 String inputBuffer = "";
 // Setup joints
@@ -35,9 +39,9 @@ Joint J2 = Joint(J2_SERVO_PIN,J2_STEP,J2_NEUTRAL,-1);
 Joint J3 = Joint(J3_SERVO_PIN,J3_STEP,J3_NEUTRAL,1);
 Joint J4 = Joint(J4_SERVO_PIN,J4_STEP,J4_NEUTRAL,-1);
 
-
 // Setup wheel
 N20 RN20 = N20(R_DIR_PIN,R_PWM_PIN,R_INVERSED);
+N20 LN20 = N20(L_DIR_PIN,L_PWM_PIN,L_INVERSED);
 
 // Setup inverse kinematic solver
 ScaraIK solver = ScaraIK();
@@ -63,9 +67,16 @@ float sampleTime = 0.01; //10ms sample time
 // Joint PID
 double J_L_input, J_L_output, J_L_setpoint;
 double J_R_input, J_R_output, J_R_setpoint;
-double J_Kp=0.3, J_Ki=0.02, J_Kd=0.01;
+double J_Kp=0.1, J_Ki=0.0, J_Kd=0.01;
 PID right_leg_pid(&J_R_input, &J_R_output, &J_R_setpoint, J_Kp, J_Ki, J_Kd, AUTOMATIC);
 PID left_leg_pid(&J_L_input, &J_L_output, &J_L_setpoint, J_Kp, J_Ki, J_Kd, AUTOMATIC);
+
+// Wheel PID
+double W_L_input, W_L_output, W_L_setpoint;
+double W_R_input, W_R_output, W_R_setpoint;
+double W_Kp=5, W_Ki=0.05, W_Kd=0.5;
+PID left_wheel_pid(&W_L_input, &W_L_output, &W_L_setpoint, W_Kp, W_Ki,W_Kd,AUTOMATIC);
+PID right_wheel_pid(&W_R_input, &W_R_output, &W_R_setpoint, W_Kp, W_Ki,W_Kd,AUTOMATIC);
 
 // ---------- ESPNow wifi receive
 typedef struct {
@@ -82,7 +93,7 @@ void onReceive(const uint8_t * mac, const uint8_t *incomingData, int len) {
 }
 
 // Robot states
-double r_height = 10; //10cm above the ground
+double r_height = 8; //10cm above the ground
 
 void init_IMU(){
 
@@ -154,6 +165,19 @@ void init_PIDs(){
   right_leg_pid.SetSampleTime(10); // match your 10ms intention
   // Add this in setup() - set to whatever x range your IK solver expects
   right_leg_pid.SetOutputLimits(-20, 20); // example: 
+
+  W_L_setpoint = -90;         // target pitch (e.g., level)
+  W_L_input = -90;    // current pitch from IMU
+  W_R_setpoint = -90;        
+  W_R_input = -90; 
+
+  left_wheel_pid.SetMode(AUTOMATIC);
+  left_wheel_pid.SetSampleTime(5); 
+  left_wheel_pid.SetOutputLimits(-100, 100); 
+
+  right_wheel_pid.SetMode(AUTOMATIC);
+  right_wheel_pid.SetSampleTime(5); 
+  right_wheel_pid.SetOutputLimits(-100, 100); 
 }
 
 void init_WIFI(){
@@ -168,24 +192,9 @@ void init_WIFI(){
 
   esp_now_register_recv_cb(onReceive);
 }
-void setup() {
-  Serial.begin(115200);
-  Serial.println("=== ESP32 Servo – Serial end effector Control ===");
-  init_IMU();
-  init_PIDs();
 
-}
-
-void loop() {
-    imuLoop();
-    // update pid inputs
-    J_L_input = ypr.roll;    
-    J_R_input = ypr.roll; 
-
-    unsigned long currentTime = millis();
-    // float deltaTime = (currentTime - lastTime) / 1000.0; // into seconds
-
-    // RN20.setSpeed(60);
+void comput_loop(){
+  // RN20.setSpeed(60);
     ScaraIKResult desire_pos;
     if(right_leg_pid.Compute()){
         // Calculate Inverse Kinematics
@@ -204,6 +213,35 @@ void loop() {
             J4.move_to_pos(desire_pos.theta2);
         }
     }
+
+    if(right_wheel_pid.Compute()){
+        RN20.setSpeed(W_R_output);
+    }
+
+    if(left_wheel_pid.Compute()){
+      LN20.setSpeed(W_L_output);
+    }
+
+}
+void setup() {
+  Serial.begin(115200);
+  Serial.println("=== ESP32 Servo – Serial end effector Control ===");
+  init_IMU();
+  init_PIDs();
+
+}
+
+void loop() {
+    imuLoop();
+    // update pid inputs
+    J_L_input = ypr.roll;    
+    J_R_input = ypr.roll; 
+    W_L_input = ypr.roll;
+    W_R_input = ypr.roll;
+    unsigned long currentTime = millis();
+    // float deltaTime = (currentTime - lastTime) / 1000.0; // into seconds
+    comput_loop();
+    
 
     static unsigned long lastPrintTime = 0;
     if (currentTime - lastPrintTime > 500) {
