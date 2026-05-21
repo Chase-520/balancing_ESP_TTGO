@@ -80,20 +80,28 @@ PID right_wheel_pid(&W_R_input, &W_R_output, &W_R_setpoint, W_Kp, W_Ki,W_Kd,AUTO
 
 // ---------- ESPNow wifi receive
 typedef struct {
-  int value;
+  double L_height;
+  double R_height;
+  double L_speed;
+  double R_speed;
 } Data;
 
 Data data;
+
+void init_data(){
+  // Initialize data
+  data.L_height = 7.0;
+  data.R_height = 7.0;
+  data.L_speed = 0.0;
+  data.R_speed = 0.0;
+}
 
 void onReceive(const uint8_t * mac, const uint8_t *incomingData, int len) {
   memcpy(&data, incomingData, sizeof(data));
 
   Serial.print("Received: ");
-  Serial.println(data.value);
+  Serial.print(data.L_height); Serial.print(" ");Serial.print(data.R_height);
 }
-
-// Robot states
-double r_height = 8; //10cm above the ground
 
 void init_IMU(){
 
@@ -198,7 +206,7 @@ void comput_loop(){
     ScaraIKResult desire_pos;
     if(right_leg_pid.Compute()){
         // Calculate Inverse Kinematics
-        if(solver.solve(-J_R_output,r_height, desire_pos)){    
+        if(solver.solve(-J_R_output,data.R_height, desire_pos)){    
             //Write to servos
             J1.move_to_pos(desire_pos.theta1);
             J2.move_to_pos(desire_pos.theta2);
@@ -207,7 +215,7 @@ void comput_loop(){
 
     if(left_leg_pid.Compute()){
         // Calculate Inverse Kinematics
-        if(solver.solve(J_L_output,r_height, desire_pos)){    
+        if(solver.solve(J_L_output,data.L_height, desire_pos)){    
             //Write to servos
             J3.move_to_pos(desire_pos.theta1);
             J4.move_to_pos(desire_pos.theta2);
@@ -223,11 +231,14 @@ void comput_loop(){
     }
 
 }
+
 void setup() {
   Serial.begin(115200);
   Serial.println("=== ESP32 Servo – Serial end effector Control ===");
   init_IMU();
   init_PIDs();
+  init_WIFI();
+  init_data();
 
 }
 
